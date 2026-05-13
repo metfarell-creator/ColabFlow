@@ -1,0 +1,6 @@
+{
+  "name": "ColabFlow",
+  "description": "A professional workspace for managing Google Colab and Jupyter dependencies, tracking ML models, and generating production-ready notebook templates.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
