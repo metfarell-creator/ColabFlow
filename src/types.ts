@@ -29,6 +29,7 @@ export interface Task {
   id: string;
   title: string;
   status: 'Todo' | 'In Progress' | 'Done';
+  priority: 'Low' | 'Medium' | 'High';
 }
 
 export interface Snapshot {
@@ -51,11 +52,22 @@ export interface GitConfig {
   remoteUrl: string;
   branch: string;
   enabled: boolean;
+  lastCommit?: {
+    message: string;
+    timestamp: number;
+    hash: string;
+  };
 }
 
 export interface HFConfig {
   repoId: string;
   enabled: boolean;
+}
+
+export interface VSCodeConfig {
+  enabled: boolean;
+  theme?: string;
+  recommendations: string[];
 }
 
 export interface Project {
@@ -69,5 +81,6 @@ export interface Project {
   snapshots: Snapshot[];
   gitConfig?: GitConfig;
   hfConfig?: HFConfig;
+  vsCodeConfig?: VSCodeConfig;
   createdAt: number;
 }
