@@ -9,6 +9,13 @@ export interface Package {
   description?: string;
 }
 
+export interface OutdatedPackage {
+  name: string;
+  currentVersion: string;
+  latestVersion: string;
+  description: string;
+}
+
 export interface MLModel {
   id: string;
   name: string;
