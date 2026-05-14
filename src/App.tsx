@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   Plus, 
   Terminal, 
@@ -31,62 +31,68 @@ import {
   ArrowUpDown,
   Settings2,
   SlidersHorizontal,
-  X
+  X,
+  FileCode,
+  Box
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Project, Package, MLModel, DataSource, Task, Snapshot, ProjectTemplate, GitConfig, HFConfig } from './types';
 import { suggestDependencies, generateColabSnippet } from './services/gemini';
 import { errorLogger } from './services/errorLogger';
+import { downloadNotebook, downloadPythonScript } from './services/notebookGenerator';
+import { loadJson, saveJson, STORAGE_KEYS } from './services/storage';
 
 export default function App() {
-  const [projects, setProjects] = useState<Project[]>(() => {
-    const saved = localStorage.getItem('colabflow_projects');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [templates, setTemplates] = useState<ProjectTemplate[]>(() => {
-    const saved = localStorage.getItem('colabflow_templates');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [projects, setProjects] = useState<Project[]>(() => 
+    loadJson(STORAGE_KEYS.PROJECTS, [])
+  );
+  const [templates, setTemplates] = useState<ProjectTemplate[]>(() => 
+    loadJson(STORAGE_KEYS.TEMPLATES, [])
+  );
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
   const [sortByPriority, setSortByPriority] = useState(false);
   const [isPushing, setIsPushing] = useState(false);
-  const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(() => {
-    const saved = localStorage.getItem('colabflow_autosave_enabled');
-    return saved !== null ? JSON.parse(saved) : true;
-  });
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(() => 
+    loadJson(STORAGE_KEYS.AUTOSAVE_ENABLED, true)
+  );
   const [lastSaved, setLastSaved] = useState<number | null>(null);
 
+  const persistData = useCallback(() => {
+    saveJson(STORAGE_KEYS.PROJECTS, projects);
+    saveJson(STORAGE_KEYS.TEMPLATES, templates);
+    setLastSaved(Date.now());
+  }, [projects, templates]);
+
   useEffect(() => {
-    localStorage.setItem('colabflow_autosave_enabled', JSON.stringify(autoSaveEnabled));
+    saveJson(STORAGE_KEYS.AUTOSAVE_ENABLED, autoSaveEnabled);
   }, [autoSaveEnabled]);
 
   useEffect(() => {
     if (!autoSaveEnabled) return;
 
+    // Save on changes if autosave is on
+    saveJson(STORAGE_KEYS.PROJECTS, projects);
+    setLastSaved(Date.now());
+  }, [projects, autoSaveEnabled]);
+
+  useEffect(() => {
+    if (!autoSaveEnabled) return;
+    saveJson(STORAGE_KEYS.TEMPLATES, templates);
+  }, [templates, autoSaveEnabled]);
+
+  useEffect(() => {
+    if (!autoSaveEnabled) return;
+
     const interval = setInterval(() => {
-      localStorage.setItem('colabflow_projects', JSON.stringify(projects));
-      localStorage.setItem('colabflow_templates', JSON.stringify(templates));
-      setLastSaved(Date.now());
-      console.log('[AutoSave] Data persisted at', new Date().toLocaleTimeString());
-    }, 30000);
+      persistData();
+      console.log('[AutoSave] Periodic sync completed.');
+    }, 60000); // Changed to 1 min for less frequent noise if reactive save is active
 
     return () => clearInterval(interval);
-  }, [projects, templates, autoSaveEnabled]);
-
-  useEffect(() => {
-    // Immediate save for structural changes even if auto-save interval is off
-    // but only if immediate save is preferred. 
-    // If the user strictly wants "periodic only", we could disable this.
-    // However, reactive save is safer for UX.
-    localStorage.setItem('colabflow_projects', JSON.stringify(projects));
-  }, [projects]);
-
-  useEffect(() => {
-    localStorage.setItem('colabflow_templates', JSON.stringify(templates));
-  }, [templates]);
+  }, [autoSaveEnabled, persistData]);
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
 
@@ -460,12 +466,22 @@ export default function App() {
                 />
               </button>
             </div>
-            {lastSaved && autoSaveEnabled && (
-              <div className="flex items-center gap-2 opacity-30">
-                <Save size={8} />
-                <span className="text-[8px] font-mono uppercase">Збережено о {new Date(lastSaved).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-              </div>
-            )}
+            <div className="flex items-center justify-between">
+               <button 
+                onClick={persistData}
+                className="flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity text-[9px] uppercase font-bold font-mono"
+              >
+                <Save size={10} />
+                Зберегти зараз
+              </button>
+              {lastSaved && (
+                <div className="flex items-center gap-2 opacity-30">
+                  <span className="text-[8px] font-mono uppercase">
+                    {new Date(lastSaved).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
           <button 
@@ -1166,6 +1182,30 @@ export default function App() {
                           >
                             <RefreshCw size={10} className={isGenerating ? 'animate-spin' : ''} />
                             Оновити
+                          </button>
+                          <button 
+                            onClick={() => {
+                              if (generatedCode && selectedProject) {
+                                downloadNotebook(selectedProject, generatedCode);
+                              }
+                            }}
+                            className="flex items-center gap-2 text-[9px] uppercase tracking-widest font-bold border border-white/30 px-3 py-1 hover:bg-white hover:text-[#141414] transition-all bg-yellow-500/10"
+                            title="Download Jupyter Notebook"
+                          >
+                            <Box size={10} />
+                            .ipynb
+                          </button>
+                          <button 
+                            onClick={() => {
+                              if (generatedCode && selectedProject) {
+                                downloadPythonScript(selectedProject, generatedCode);
+                              }
+                            }}
+                            className="flex items-center gap-2 text-[9px] uppercase tracking-widest font-bold border border-white/30 px-3 py-1 hover:bg-white hover:text-[#141414] transition-all bg-blue-500/10"
+                            title="Download Python Script"
+                          >
+                            <FileCode size={10} />
+                            .py
                           </button>
                           <button 
                             onClick={() => {
