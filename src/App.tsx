@@ -25,10 +25,11 @@ import {
   Layout,
   Copy,
   GitBranch,
-  Github
+  Github,
+  Smile
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Project, Package, MLModel, DataSource, Task, Snapshot, ProjectTemplate, GitConfig } from './types';
+import { Project, Package, MLModel, DataSource, Task, Snapshot, ProjectTemplate, GitConfig, HFConfig } from './types';
 import { suggestDependencies, generateColabSnippet } from './services/gemini';
 
 export default function App() {
@@ -74,6 +75,10 @@ export default function App() {
         branch: 'main',
         enabled: false
       },
+      hfConfig: {
+        repoId: '',
+        enabled: false
+      },
       createdAt: Date.now()
     };
     setProjects([newProject, ...projects]);
@@ -110,6 +115,10 @@ export default function App() {
       gitConfig: {
         remoteUrl: '',
         branch: 'main',
+        enabled: false
+      },
+      hfConfig: {
+        repoId: '',
         enabled: false
       },
       createdAt: Date.now()
@@ -211,7 +220,8 @@ export default function App() {
       selectedProject.dependencies.map(d => d.name),
       selectedProject.models,
       selectedProject.dataSources,
-      selectedProject.gitConfig
+      selectedProject.gitConfig,
+      selectedProject.hfConfig
     );
     setGeneratedCode(code);
     
@@ -553,6 +563,46 @@ export default function App() {
                             className="bg-[#141414]/5 border-b border-[#141414]/20 px-2 py-1 text-[10px] w-full outline-none focus:bg-[#141414]/10 transition-colors font-mono"
                           />
                         </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-12">
+                  <div className="flex items-center gap-3 mb-8">
+                    <Smile size={18} />
+                    <h2 className="font-serif italic text-xl">Hugging Face Хостинг</h2>
+                  </div>
+                  <div className="border border-[#141414] p-6 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-mono uppercase tracking-widest opacity-60">Статус</span>
+                      <button 
+                        onClick={() => updateProject({ 
+                          hfConfig: { 
+                            repoId: selectedProject.hfConfig?.repoId || '', 
+                            enabled: !selectedProject.hfConfig?.enabled 
+                          } 
+                        })}
+                        className={`text-[9px] uppercase font-bold px-3 py-1 border transition-colors ${selectedProject.hfConfig?.enabled ? 'bg-[#141414] text-[#E4E3E0] border-[#141414]' : 'border-[#141414]/20 opacity-50'}`}
+                      >
+                        {selectedProject.hfConfig?.enabled ? 'Активно' : 'Вимкнено'}
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-[8px] uppercase opacity-40 mb-1 font-bold">Repo ID</p>
+                        <input 
+                          value={selectedProject.hfConfig?.repoId || ''}
+                          onChange={(e) => updateProject({ 
+                            hfConfig: { 
+                              ...(selectedProject.hfConfig || { enabled: false }), 
+                              repoId: e.target.value 
+                            } 
+                          })}
+                          placeholder="username/model-repo"
+                          className="bg-[#141414]/5 border-b border-[#141414]/20 px-2 py-1 text-[10px] w-full outline-none focus:bg-[#141414]/10 transition-colors font-mono"
+                        />
                       </div>
                     </div>
                   </div>

@@ -22,7 +22,7 @@ export async function suggestDependencies(prompt: string) {
   }
 }
 
-export async function generateColabSnippet(projectName: string, dependencies: string[], models: any[], dataSources: any[], gitConfig?: any) {
+export async function generateColabSnippet(projectName: string, dependencies: string[], models: any[], dataSources: any[], gitConfig?: any, hfConfig?: any) {
   const model = "gemini-3-flash-preview";
   const result = await ai.models.generateContent({
     model,
@@ -31,12 +31,16 @@ export async function generateColabSnippet(projectName: string, dependencies: st
     Models: ${models.map(m => m.name).join(", ")}.
     Data Sources: ${dataSources.map(ds => `${ds.name} (${ds.type}): ${ds.path}`).join(", ")}.
     Git Config: ${gitConfig?.enabled ? `Remote: ${gitConfig.remoteUrl}, Branch: ${gitConfig.branch}` : 'None'}.
+    Hugging Face: ${hfConfig?.enabled ? `Repo ID: ${hfConfig.repoId}` : 'None'}.
     Include:
-    1. Dependencies installation.
+    1. Dependencies installation (include huggingface_hub).
     2. Git integration (cloning repo if enabled).
-    3. Data loading logic for specified sources.
-    4. Model initialization template.
-    5. Training loop boiler plate.
+    3. Hugging Face login requirement (huggingface_hub.login).
+    4. Model downloading (snapshot_download or from_pretrained) if HF enabled.
+    5. Data loading logic for specified sources.
+    6. Model initialization template.
+    7. Training loop boiler plate.
+    8. Logic to push model to HF (push_to_hub) if HF enabled.
     Return only the python code block.`,
   });
 

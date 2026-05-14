@@ -53,6 +53,11 @@ export interface GitConfig {
   enabled: boolean;
 }
 
+export interface HFConfig {
+  repoId: string;
+  enabled: boolean;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -63,5 +68,6 @@ export interface Project {
   tasks: Task[];
   snapshots: Snapshot[];
   gitConfig?: GitConfig;
+  hfConfig?: HFConfig;
   createdAt: number;
 }
