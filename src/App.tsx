@@ -21,15 +21,23 @@ import {
   Laptop,
   History,
   Clock,
-  RefreshCw
+  RefreshCw,
+  Layout,
+  Copy,
+  GitBranch,
+  Github
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Project, Package, MLModel, DataSource, Task, Snapshot } from './types';
+import { Project, Package, MLModel, DataSource, Task, Snapshot, ProjectTemplate, GitConfig } from './types';
 import { suggestDependencies, generateColabSnippet } from './services/gemini';
 
 export default function App() {
   const [projects, setProjects] = useState<Project[]>(() => {
     const saved = localStorage.getItem('colabflow_projects');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [templates, setTemplates] = useState<ProjectTemplate[]>(() => {
+    const saved = localStorage.getItem('colabflow_templates');
     return saved ? JSON.parse(saved) : [];
   });
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
@@ -40,6 +48,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('colabflow_projects', JSON.stringify(projects));
   }, [projects]);
+
+  useEffect(() => {
+    localStorage.setItem('colabflow_templates', JSON.stringify(templates));
+  }, [templates]);
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
 
@@ -57,6 +69,49 @@ export default function App() {
       dataSources: [],
       tasks: [],
       snapshots: [],
+      gitConfig: {
+        remoteUrl: '',
+        branch: 'main',
+        enabled: false
+      },
+      createdAt: Date.now()
+    };
+    setProjects([newProject, ...projects]);
+    setSelectedProjectId(newProject.id);
+  };
+
+  const saveAsTemplate = () => {
+    if (!selectedProject) return;
+    const name = prompt('Назва шаблону:', `${selectedProject.name} (Шаблон)`);
+    if (!name) return;
+
+    const newTemplate: ProjectTemplate = {
+      id: crypto.randomUUID(),
+      name,
+      description: selectedProject.description,
+      dependencies: [...selectedProject.dependencies],
+      models: selectedProject.models.map(({ id, exportStatus, ...rest }) => rest),
+      dataSources: selectedProject.dataSources.map(({ id, ...rest }) => rest)
+    };
+
+    setTemplates([newTemplate, ...templates]);
+  };
+
+  const createFromTemplate = (template: ProjectTemplate) => {
+    const newProject: Project = {
+      id: crypto.randomUUID(),
+      name: `Копія ${template.name}`,
+      description: template.description,
+      dependencies: [...template.dependencies],
+      models: template.models.map(m => ({ ...m, id: crypto.randomUUID(), exportStatus: 'Pending' })),
+      dataSources: template.dataSources.map(ds => ({ ...ds, id: crypto.randomUUID() })),
+      tasks: [],
+      snapshots: [],
+      gitConfig: {
+        remoteUrl: '',
+        branch: 'main',
+        enabled: false
+      },
       createdAt: Date.now()
     };
     setProjects([newProject, ...projects]);
@@ -155,7 +210,8 @@ export default function App() {
       selectedProject.name,
       selectedProject.dependencies.map(d => d.name),
       selectedProject.models,
-      selectedProject.dataSources
+      selectedProject.dataSources,
+      selectedProject.gitConfig
     );
     setGeneratedCode(code);
     
@@ -193,7 +249,47 @@ export default function App() {
               <Plus size={14} className="group-hover:rotate-90 transition-transform" />
             </button>
           </div>
+        </div>
 
+        {templates.length > 0 && (
+          <div className="flex-1 overflow-y-auto border-t border-[#141414]/10 mt-4 pt-4">
+            <div className="px-6 mb-2">
+              <p className="text-[9px] uppercase tracking-widest opacity-40 font-bold flex items-center gap-2">
+                <Layout size={10} />
+                Шаблони
+              </p>
+            </div>
+            <div className="space-y-0 text-[10px]">
+              {templates.map(t => (
+                <div key={t.id} className="group relative">
+                  <button
+                    onClick={() => createFromTemplate(t)}
+                    className="w-full text-left px-6 py-2 hover:bg-[#141414]/5 transition-colors flex items-center justify-between"
+                  >
+                    <div className="truncate pr-4 opacity-70 group-hover:opacity-100">{t.name}</div>
+                    <Plus size={10} className="shrink-0 opacity-20 group-hover:opacity-100" />
+                  </button>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm('Видалити шаблон?')) {
+                        setTemplates(templates.filter(temp => temp.id !== t.id));
+                      }
+                    }}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-40 hover:opacity-100 p-2 text-red-500"
+                  >
+                    <Trash2 size={10} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex-1 overflow-y-auto border-t border-[#141414]/10 mt-4 pt-4">
+          <div className="px-6 mb-2">
+            <p className="text-[9px] uppercase tracking-widest opacity-40 font-bold">Проекти</p>
+          </div>
           <div className="space-y-0 text-[11px]">
             {projects.map(p => (
               <button
@@ -242,18 +338,27 @@ export default function App() {
                     <Terminal size={16} />
                     <span className="text-xs font-mono uppercase tracking-wider">Експорт у Colab</span>
                   </button>
-                  <button 
-                    onClick={() => {
-                      if (confirm('Видалити проект?')) {
-                        setProjects(projects.filter(p => p.id !== selectedProjectId));
-                        setSelectedProjectId(null);
-                      }
-                    }}
-                    className="flex items-center gap-3 px-6 py-2 border border-[#141414] hover:bg-red-500 hover:text-white hover:border-red-500 transition-colors"
-                  >
-                    <Trash2 size={14} />
-                    <span className="text-[10px] font-mono uppercase tracking-widest">Видалити</span>
-                  </button>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={saveAsTemplate}
+                      className="flex-1 flex items-center gap-3 px-4 py-2 border border-[#141414] hover:bg-[#141414] hover:text-[#E4E3E0] transition-colors"
+                    >
+                      <Copy size={12} />
+                      <span className="text-[10px] font-mono uppercase tracking-widest">Шаблон</span>
+                    </button>
+                    <button 
+                      onClick={() => {
+                        if (confirm('Видалити проект?')) {
+                          setProjects(projects.filter(p => p.id !== selectedProjectId));
+                          setSelectedProjectId(null);
+                        }
+                      }}
+                      className="flex-1 flex items-center gap-3 px-4 py-2 border border-[#141414] hover:bg-red-500 hover:text-white hover:border-red-500 transition-colors"
+                    >
+                      <Trash2 size={12} />
+                      <span className="text-[10px] font-mono uppercase tracking-widest">Видалити</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -391,6 +496,64 @@ export default function App() {
                           </div>
                         </motion.div>
                       ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-12">
+                  <div className="flex items-center gap-3 mb-8">
+                    <Github size={18} />
+                    <h2 className="font-serif italic text-xl">Git Репозиторій</h2>
+                  </div>
+                  <div className="border border-[#141414] p-6 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-mono uppercase tracking-widest opacity-60">Статус</span>
+                      <button 
+                        onClick={() => updateProject({ 
+                          gitConfig: { 
+                            remoteUrl: selectedProject.gitConfig?.remoteUrl || '', 
+                            branch: selectedProject.gitConfig?.branch || 'main', 
+                            enabled: !selectedProject.gitConfig?.enabled 
+                          } 
+                        })}
+                        className={`text-[9px] uppercase font-bold px-3 py-1 border transition-colors ${selectedProject.gitConfig?.enabled ? 'bg-[#141414] text-[#E4E3E0] border-[#141414]' : 'border-[#141414]/20 opacity-50'}`}
+                      >
+                        {selectedProject.gitConfig?.enabled ? 'Активно' : 'Вимкнено'}
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-[8px] uppercase opacity-40 mb-1 font-bold">Remote URL</p>
+                        <input 
+                          value={selectedProject.gitConfig?.remoteUrl || ''}
+                          onChange={(e) => updateProject({ 
+                            gitConfig: { 
+                              ...(selectedProject.gitConfig || { branch: 'main', enabled: false }), 
+                              remoteUrl: e.target.value 
+                            } 
+                          })}
+                          placeholder="https://github.com/user/repo.git"
+                          className="bg-[#141414]/5 border-b border-[#141414]/20 px-2 py-1 text-[10px] w-full outline-none focus:bg-[#141414]/10 transition-colors font-mono"
+                        />
+                      </div>
+                      <div className="flex items-center gap-4">
+                         <div className="flex-1">
+                          <p className="text-[8px] uppercase opacity-40 mb-1 font-bold flex items-center gap-1">
+                            <GitBranch size={8} /> Branch
+                          </p>
+                          <input 
+                            value={selectedProject.gitConfig?.branch || 'main'}
+                            onChange={(e) => updateProject({ 
+                              gitConfig: { 
+                                ...(selectedProject.gitConfig || { remoteUrl: '', enabled: false }), 
+                                branch: e.target.value 
+                              } 
+                            })}
+                            className="bg-[#141414]/5 border-b border-[#141414]/20 px-2 py-1 text-[10px] w-full outline-none focus:bg-[#141414]/10 transition-colors font-mono"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

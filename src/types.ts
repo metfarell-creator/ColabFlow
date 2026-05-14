@@ -38,6 +38,21 @@ export interface Snapshot {
   note: string;
 }
 
+export interface ProjectTemplate {
+  id: string;
+  name: string;
+  description: string;
+  dependencies: Package[];
+  models: Omit<MLModel, 'id' | 'exportStatus'>[];
+  dataSources: Omit<DataSource, 'id'>[];
+}
+
+export interface GitConfig {
+  remoteUrl: string;
+  branch: string;
+  enabled: boolean;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -47,5 +62,6 @@ export interface Project {
   dataSources: DataSource[];
   tasks: Task[];
   snapshots: Snapshot[];
+  gitConfig?: GitConfig;
   createdAt: number;
 }

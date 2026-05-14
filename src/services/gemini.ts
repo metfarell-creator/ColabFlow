@@ -22,7 +22,7 @@ export async function suggestDependencies(prompt: string) {
   }
 }
 
-export async function generateColabSnippet(projectName: string, dependencies: string[], models: any[], dataSources: any[]) {
+export async function generateColabSnippet(projectName: string, dependencies: string[], models: any[], dataSources: any[], gitConfig?: any) {
   const model = "gemini-3-flash-preview";
   const result = await ai.models.generateContent({
     model,
@@ -30,11 +30,13 @@ export async function generateColabSnippet(projectName: string, dependencies: st
     Dependencies: ${dependencies.join(", ")}.
     Models: ${models.map(m => m.name).join(", ")}.
     Data Sources: ${dataSources.map(ds => `${ds.name} (${ds.type}): ${ds.path}`).join(", ")}.
+    Git Config: ${gitConfig?.enabled ? `Remote: ${gitConfig.remoteUrl}, Branch: ${gitConfig.branch}` : 'None'}.
     Include:
     1. Dependencies installation.
-    2. Data loading logic for specified sources.
-    3. Model initialization template.
-    4. Training loop boiler plate.
+    2. Git integration (cloning repo if enabled).
+    3. Data loading logic for specified sources.
+    4. Model initialization template.
+    5. Training loop boiler plate.
     Return only the python code block.`,
   });
 
